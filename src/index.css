@@ -1,0 +1,391 @@
+/* WP Admin Dashly — settings page styles. Scoped under .wpad-app and #wpad-root. */
+
+#wpad-root {
+	max-width: 1200px;
+	margin-top: 16px;
+}
+
+.wpad-loading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 24px;
+	color: #50575e;
+}
+
+.wpad-app {
+	font-family: inherit;
+}
+
+/* ---- Header ---- */
+
+.wpad-header {
+	margin-bottom: 16px;
+}
+
+.wpad-header h1 {
+	margin: 0 0 4px 0;
+}
+
+.wpad-dirty-badge {
+	display: inline-block;
+	padding: 4px 10px;
+	background: #fcf9e8;
+	border: 1px solid #f0c33c;
+	border-radius: 4px;
+	font-size: 12px;
+	font-weight: 500;
+	color: #614200;
+}
+
+.wpad-notice {
+	margin: 0 0 16px 0 !important;
+}
+
+/* ---- Two-column grid ---- */
+
+.wpad-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 360px;
+	gap: 24px;
+	align-items: start;
+}
+
+@media (max-width: 960px) {
+	.wpad-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* ---- Tab panel ---- */
+
+.wpad-tabs {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+}
+
+/* Override default WP tab nav to look cleaner */
+.wpad-tabs .components-tab-panel__tabs {
+	border-bottom: 1px solid #dcdcde;
+	padding: 0 4px;
+	display: flex;
+	gap: 2px;
+	background: #f9f9f9;
+	border-radius: 4px 4px 0 0;
+}
+
+.wpad-tabs .components-tab-panel__tabs-item {
+	border: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	padding: 10px 14px;
+	font-size: 13px;
+	font-weight: 500;
+	color: #50575e;
+	background: transparent;
+	transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.wpad-tabs .components-tab-panel__tabs-item:hover {
+	color: #1d2327;
+}
+
+.wpad-tabs .components-tab-panel__tabs-item.is-active {
+	color: #2271b1;
+	border-bottom-color: #2271b1;
+	box-shadow: none;
+}
+
+.wpad-tab-content {
+	padding: 20px;
+}
+
+/* ---- Preset grid ---- */
+
+.wpad-preset-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 12px;
+}
+
+.wpad-preset-card {
+	padding: 12px;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	background: #fff;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.wpad-preset-card:hover {
+	border-color: #2271b1;
+	transform: translateY(-1px);
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.wpad-preset-card.is-active {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+}
+
+.wpad-preset-card:focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+
+.wpad-preset-swatches {
+	display: flex;
+	gap: 4px;
+	height: 32px;
+}
+
+.wpad-preset-swatches > span {
+	flex: 1;
+	border-radius: 4px;
+	border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.wpad-preset-label {
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.wpad-preset-desc {
+	font-size: 12px;
+	color: #50575e;
+	line-height: 1.4;
+}
+
+.wpad-preset-section-label {
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: #50575e;
+	margin: 20px 0 10px;
+}
+
+/* Preset card — outer wrapper so delete button can be positioned */
+.wpad-preset-card {
+	position: relative;
+}
+
+.wpad-preset-card-body {
+	all: unset;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	width: 100%;
+}
+
+.wpad-preset-delete {
+	all: unset;
+	cursor: pointer;
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	width: 18px;
+	height: 18px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.08);
+	font-size: 14px;
+	line-height: 1;
+	color: #50575e;
+	opacity: 0;
+	transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.wpad-preset-card:hover .wpad-preset-delete {
+	opacity: 1;
+}
+
+.wpad-preset-delete:hover {
+	background: #d63638;
+	color: #fff;
+}
+
+/* Inline reset confirmation */
+.wpad-reset-confirm {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.wpad-reset-confirm-label {
+	font-size: 12px;
+	color: #50575e;
+}
+
+/* Save as preset form */
+.wpad-save-preset-form {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.wpad-preset-name-input {
+	width: 100%;
+	padding: 6px 10px;
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	font-size: 13px;
+	box-sizing: border-box;
+}
+
+.wpad-preset-name-input:focus {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: none;
+}
+
+/* ---- Color field ---- */
+
+.wpad-color-field {
+	border: 1px solid #f0f0f1;
+	border-radius: 4px;
+	padding: 10px 12px;
+}
+
+.wpad-field-label {
+	font-weight: 500;
+	font-size: 13px;
+}
+
+.wpad-field-help {
+	font-size: 12px;
+	color: #50575e;
+	margin-top: 2px;
+}
+
+.wpad-swatch {
+	all: unset;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 96px;
+	height: 32px;
+	padding: 0 10px;
+	border: 1px solid rgba(0, 0, 0, 0.15);
+	border-radius: 4px;
+	box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6);
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 11px;
+	color: rgba(0, 0, 0, 0.85);
+	transition: transform 0.1s ease;
+}
+
+.wpad-swatch:hover {
+	transform: scale(1.02);
+}
+
+.wpad-swatch-hex {
+	background: rgba(255, 255, 255, 0.85);
+	padding: 2px 6px;
+	border-radius: 3px;
+	letter-spacing: 0.02em;
+}
+
+/* Floating popover for color picker — no layout shift */
+.wpad-color-popover {
+	padding: 12px;
+	background: #fff;
+}
+
+.wpad-color-popover .components-color-picker {
+	box-shadow: none;
+}
+
+/* ---- Sidebar ---- */
+
+.wpad-side {
+	position: sticky;
+	top: 56px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.wpad-actions {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+/* ---- Mini preview ---- */
+
+.wpad-mini-preview {
+	margin-top: 12px;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	overflow: hidden;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.wpad-mini-bar {
+	height: 22px;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.wpad-mini-body {
+	display: flex;
+	min-height: 140px;
+}
+
+.wpad-mini-side {
+	width: 90px;
+	padding: 8px 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.wpad-mini-side-item {
+	padding: 6px 10px;
+	font-size: 11px;
+}
+
+.wpad-mini-active {
+	font-weight: 600;
+}
+
+.wpad-mini-content {
+	flex: 1;
+	padding: 12px;
+	background: #f6f7f7;
+}
+
+.wpad-mini-card {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	padding: 10px;
+}
+
+.wpad-mini-line {
+	height: 6px;
+	background: #dcdcde;
+	border-radius: 3px;
+	margin-bottom: 6px;
+}
+
+.wpad-mini-line.short {
+	width: 60%;
+	margin-bottom: 10px;
+}
+
+.wpad-mini-btn {
+	all: unset;
+	cursor: default;
+	display: inline-block;
+	padding: 4px 10px;
+	font-size: 11px;
+	color: #fff;
+	font-weight: 500;
+}

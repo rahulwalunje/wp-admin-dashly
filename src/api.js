@@ -57,3 +57,27 @@ export function deleteCustomPreset( id ) {
 		method: 'DELETE',
 	} );
 }
+
+export function getMenu() {
+	// $menu/$submenu are only populated during a real admin page load, not
+	// during a REST request. The admin page passes the serialized menu via
+	// WPAD_BOOT.adminMenu so we don't need a round-trip.
+	const adminMenu = boot.adminMenu;
+	if ( Array.isArray( adminMenu ) && adminMenu.length ) {
+		return Promise.resolve( adminMenu );
+	}
+	// Fallback: try the REST endpoint (useful for debugging).
+	return apiFetch( { path: `${ namespace }/menu` } );
+}
+
+export function getMenuPrefs() {
+	return apiFetch( { path: `${ namespace }/menu-preferences` } );
+}
+
+export function saveMenuPrefs( diff ) {
+	return apiFetch( {
+		path: `${ namespace }/menu-preferences`,
+		method: 'POST',
+		data: diff,
+	} );
+}

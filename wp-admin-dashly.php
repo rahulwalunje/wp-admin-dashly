@@ -4,7 +4,7 @@
  * Plugin URI: https://www.wpbeaverbuilder.com/			
  * Description: Personalize your WordPress admin — colors, fonts, layout, and menu organization, saved per user.
  * Version: 1.0.0
- * Author: The Rahul Walunje
+ * Author: Rahul Walunje
  * Author URI: https://www.wpbeaverbuilder.com/
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -33,6 +33,7 @@ require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-preferences.php';
 require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-rest-controller.php';
 require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-admin-page.php';
 require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-style-injector.php';
+require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-menu-customizer.php';
 require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-plugin.php';
 
 // Boot the plugin.

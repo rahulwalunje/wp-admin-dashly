@@ -31,6 +31,7 @@ import { __ } from '@wordpress/i18n';
 
 import { getPreferences, savePreferences, resetPreferences, getPresets, saveCustomPreset, deleteCustomPreset } from './api';
 import { applyLivePreview } from './livePreview';
+import MenuOrganizer from './MenuOrganizer';
 
 const DEFAULT_PREFS = {
 	enabled: true,
@@ -57,6 +58,16 @@ export default function App() {
 	const [ savePresetName, setSavePresetName ] = useState( '' );
 	const [ showSavePreset, setShowSavePreset ] = useState( false );
 	const [ savingPreset, setSavingPreset ]     = useState( false );
+	const [ activeTab, setActiveTab ]           = useState( 'presets' );
+	const [ menuSaving, setMenuSaving ]         = useState( false );
+	const [ menuDirty, setMenuDirty ]           = useState( false );
+	const [ savedFlash, setSavedFlash ]         = useState( false );
+	const menuRef                               = useRef();
+
+	const flashSaved = useCallback( () => {
+		setSavedFlash( true );
+		setTimeout( () => setSavedFlash( false ), 3000 );
+	}, [] );
 
 	// Initial load.
 	useEffect( () => {
@@ -131,6 +142,7 @@ export default function App() {
 			setPrefs( saved );
 			setInitialPrefs( saved );
 			setStatus( { loading: false, saving: false, error: null, savedAt: Date.now() } );
+			flashSaved();
 		} catch ( err ) {
 			setStatus( ( s ) => ( { ...s, saving: false, error: err.message || 'Save failed' } ) );
 		}
@@ -195,6 +207,7 @@ export default function App() {
 		{ name: 'colors',     title: __( 'Colors', 'wp-admin-dashly' ),     className: 'wpad-tab' },
 		{ name: 'typography', title: __( 'Typography', 'wp-admin-dashly' ), className: 'wpad-tab' },
 		{ name: 'layout',     title: __( 'Layout', 'wp-admin-dashly' ),     className: 'wpad-tab' },
+		{ name: 'menu',       title: __( 'Menu', 'wp-admin-dashly' ),       className: 'wpad-tab' },
 		{ name: 'general',    title: __( 'General', 'wp-admin-dashly' ),    className: 'wpad-tab' },
 	];
 
@@ -208,7 +221,7 @@ export default function App() {
 							{ __( 'Personalize your admin. Changes apply only to your account.', 'wp-admin-dashly' ) }
 						</Text>
 					</FlexBlock>
-					{ isDirty && (
+					{ ( isDirty || menuDirty ) && (
 						<FlexItem>
 							<span className="wpad-dirty-badge">{ __( 'Unsaved changes', 'wp-admin-dashly' ) }</span>
 						</FlexItem>
@@ -221,7 +234,7 @@ export default function App() {
 					{ status.error }
 				</Notice>
 			) }
-			{ status.savedAt > 0 && ! isDirty && ! status.error && (
+			{ savedFlash && ! status.error && (
 				<Notice status="success" isDismissible={ false } className="wpad-notice">
 					{ __( 'Saved!', 'wp-admin-dashly' ) }
 				</Notice>
@@ -232,6 +245,7 @@ export default function App() {
 					<TabPanel
 						className="wpad-tabs"
 						tabs={ tabs }
+						onSelect={ ( tab ) => { setActiveTab( tab ); setConfirmReset( false ); } }
 					>
 						{ ( tab ) => (
 							<div className="wpad-tab-content">
@@ -335,6 +349,18 @@ export default function App() {
 									</VStack>
 								) }
 
+								{ tab.name === 'menu' && (
+									<MenuOrganizer
+										ref={ menuRef }
+										onSaveStart={ () => setMenuSaving( true ) }
+										onSaveEnd={ ( success ) => {
+											setMenuSaving( false );
+											if ( success ) flashSaved();
+										} }
+										onDirtyChange={ setMenuDirty }
+									/>
+								) }
+
 								{ tab.name === 'general' && (
 									<PanelRow>
 										<ToggleControl
@@ -365,99 +391,151 @@ export default function App() {
 					</Card>
 
 					<div className="wpad-actions">
-						<Flex>
-							<FlexBlock>
-								<Button
-									variant="primary"
-									onClick={ handleSave }
-									disabled={ ! isDirty || status.saving }
-									isBusy={ status.saving }
-								>
-									{ status.saving ? __( 'Saving…', 'wp-admin-dashly' ) : __( 'Save Changes', 'wp-admin-dashly' ) }
-								</Button>
-							</FlexBlock>
-							<FlexItem>
-								<Button variant="tertiary" onClick={ handleDiscard } disabled={ ! isDirty || status.saving }>
-									{ __( 'Discard', 'wp-admin-dashly' ) }
-								</Button>
-							</FlexItem>
-						</Flex>
-
-						{ ! showSavePreset ? (
-							<Button
-								variant="secondary"
-								onClick={ () => setShowSavePreset( true ) }
-								style={ { width: '100%' } }
-							>
-								{ __( 'Save as preset…', 'wp-admin-dashly' ) }
-							</Button>
-						) : (
-							<div className="wpad-save-preset-form">
-								<input
-									type="text"
-									className="wpad-preset-name-input"
-									placeholder={ __( 'Preset name', 'wp-admin-dashly' ) }
-									value={ savePresetName }
-									onChange={ ( e ) => setSavePresetName( e.target.value ) }
-									onKeyDown={ ( e ) => {
-										if ( e.key === 'Enter' ) handleSaveAsPreset();
-										if ( e.key === 'Escape' ) { setShowSavePreset( false ); setSavePresetName( '' ); }
-									} }
-									// eslint-disable-next-line jsx-a11y/no-autofocus
-									autoFocus
-								/>
+						{ activeTab === 'menu' ? (
+							<>
 								<Flex>
 									<FlexBlock>
 										<Button
 											variant="primary"
-											onClick={ handleSaveAsPreset }
-											disabled={ ! savePresetName.trim() || savingPreset }
-											isBusy={ savingPreset }
-											style={ { width: '100%' } }
+											onClick={ () => menuRef.current?.save() }
+											isBusy={ menuSaving }
+											disabled={ ! menuDirty || menuSaving }
 										>
-											{ __( 'Save', 'wp-admin-dashly' ) }
+											{ menuSaving ? __( 'Saving…', 'wp-admin-dashly' ) : __( 'Save Changes', 'wp-admin-dashly' ) }
 										</Button>
 									</FlexBlock>
-									<FlexItem>
-										<Button
-											variant="tertiary"
-											onClick={ () => { setShowSavePreset( false ); setSavePresetName( '' ); } }
-										>
-											{ __( 'Cancel', 'wp-admin-dashly' ) }
-										</Button>
-									</FlexItem>
 								</Flex>
-							</div>
-						) }
 
-						{ ! confirmReset ? (
-							<Button variant="link" onClick={ () => setConfirmReset( true ) } isDestructive>
-								{ __( 'Reset to defaults', 'wp-admin-dashly' ) }
-							</Button>
+								{ ! confirmReset ? (
+									<Button
+										variant="link"
+										onClick={ () => setConfirmReset( true ) }
+										isDestructive
+									>
+										{ __( 'Restore original menu', 'wp-admin-dashly' ) }
+									</Button>
+								) : (
+									<div className="wpad-reset-confirm">
+										<span className="wpad-reset-confirm-label">
+											{ __( 'Restore the original menu order, visibility and labels?', 'wp-admin-dashly' ) }
+										</span>
+										<Flex>
+											<FlexBlock>
+												<Button
+													variant="primary"
+													isDestructive
+													onClick={ () => { setConfirmReset( false ); menuRef.current?.reset(); } }
+													style={ { width: '100%' } }
+												>
+													{ __( 'Yes, reset', 'wp-admin-dashly' ) }
+												</Button>
+											</FlexBlock>
+											<FlexItem>
+												<Button variant="tertiary" onClick={ () => setConfirmReset( false ) }>
+													{ __( 'Cancel', 'wp-admin-dashly' ) }
+												</Button>
+											</FlexItem>
+										</Flex>
+									</div>
+								) }
+							</>
 						) : (
-							<div className="wpad-reset-confirm">
-								<span className="wpad-reset-confirm-label">
-									{ __( 'Reset all styling to defaults?', 'wp-admin-dashly' ) }
-								</span>
+							<>
 								<Flex>
 									<FlexBlock>
 										<Button
 											variant="primary"
-											isDestructive
-											onClick={ () => { setConfirmReset( false ); handleReset(); } }
+											onClick={ handleSave }
+											disabled={ ! isDirty || status.saving }
 											isBusy={ status.saving }
-											style={ { width: '100%' } }
 										>
-											{ __( 'Yes, reset', 'wp-admin-dashly' ) }
+											{ status.saving ? __( 'Saving…', 'wp-admin-dashly' ) : __( 'Save Changes', 'wp-admin-dashly' ) }
 										</Button>
 									</FlexBlock>
 									<FlexItem>
-										<Button variant="tertiary" onClick={ () => setConfirmReset( false ) }>
-											{ __( 'Cancel', 'wp-admin-dashly' ) }
+										<Button variant="tertiary" onClick={ handleDiscard } disabled={ ! isDirty || status.saving }>
+											{ __( 'Discard', 'wp-admin-dashly' ) }
 										</Button>
 									</FlexItem>
 								</Flex>
-							</div>
+
+								{ ! showSavePreset ? (
+									<Button
+										variant="secondary"
+										onClick={ () => setShowSavePreset( true ) }
+										style={ { width: '100%' } }
+									>
+										{ __( 'Save as preset…', 'wp-admin-dashly' ) }
+									</Button>
+								) : (
+									<div className="wpad-save-preset-form">
+										<input
+											type="text"
+											className="wpad-preset-name-input"
+											placeholder={ __( 'Preset name', 'wp-admin-dashly' ) }
+											value={ savePresetName }
+											onChange={ ( e ) => setSavePresetName( e.target.value ) }
+											onKeyDown={ ( e ) => {
+												if ( e.key === 'Enter' ) handleSaveAsPreset();
+												if ( e.key === 'Escape' ) { setShowSavePreset( false ); setSavePresetName( '' ); }
+											} }
+											// eslint-disable-next-line jsx-a11y/no-autofocus
+											autoFocus
+										/>
+										<Flex>
+											<FlexBlock>
+												<Button
+													variant="primary"
+													onClick={ handleSaveAsPreset }
+													disabled={ ! savePresetName.trim() || savingPreset }
+													isBusy={ savingPreset }
+													style={ { width: '100%' } }
+												>
+													{ __( 'Save', 'wp-admin-dashly' ) }
+												</Button>
+											</FlexBlock>
+											<FlexItem>
+												<Button
+													variant="tertiary"
+													onClick={ () => { setShowSavePreset( false ); setSavePresetName( '' ); } }
+												>
+													{ __( 'Cancel', 'wp-admin-dashly' ) }
+												</Button>
+											</FlexItem>
+										</Flex>
+									</div>
+								) }
+
+								{ ! confirmReset ? (
+									<Button variant="link" onClick={ () => setConfirmReset( true ) } isDestructive>
+										{ __( 'Reset to defaults', 'wp-admin-dashly' ) }
+									</Button>
+								) : (
+									<div className="wpad-reset-confirm">
+										<span className="wpad-reset-confirm-label">
+											{ __( 'Reset all styling to defaults?', 'wp-admin-dashly' ) }
+										</span>
+										<Flex>
+											<FlexBlock>
+												<Button
+													variant="primary"
+													isDestructive
+													onClick={ () => { setConfirmReset( false ); handleReset(); } }
+													isBusy={ status.saving }
+													style={ { width: '100%' } }
+												>
+													{ __( 'Yes, reset', 'wp-admin-dashly' ) }
+												</Button>
+											</FlexBlock>
+											<FlexItem>
+												<Button variant="tertiary" onClick={ () => setConfirmReset( false ) }>
+													{ __( 'Cancel', 'wp-admin-dashly' ) }
+												</Button>
+											</FlexItem>
+										</Flex>
+									</div>
+								) }
+							</>
 						) }
 					</div>
 				</aside>

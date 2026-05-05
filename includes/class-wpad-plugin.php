@@ -24,6 +24,9 @@ class Plugin {
 	/** @var Style_Injector */
 	public $style_injector;
 
+	/** @var Menu_Customizer */
+	public $menu_customizer;
+
 	public static function instance() {
 		if ( null === self::$instance ) {
 			self::$instance = new self();
@@ -35,11 +38,19 @@ class Plugin {
 		$this->admin_page      = new Admin_Page();
 		$this->rest_controller = new REST_Controller();
 		$this->style_injector  = new Style_Injector();
+		$this->menu_customizer = new Menu_Customizer();
 	}
 
 	public function init() {
 		// Load text domain for translations.
 		load_plugin_textdomain( 'wp-admin-dashly', false, dirname( plugin_basename( WPAD_PLUGIN_FILE ) ) . '/languages' );
+
+		// Snapshot the raw menu before our customizer modifies it (priority 100 < 9999).
+		// This gives the React organizer the full list including hidden items.
+		add_action( 'admin_menu', array( $this->admin_page, 'capture_raw_menu' ), 100 );
+
+		// Per-user menu customization — runs at priority 9999, after all plugins register items.
+		add_action( 'admin_menu', array( $this->menu_customizer, 'apply' ), 9999 );
 
 		// Admin menu + assets.
 		add_action( 'admin_menu', array( $this->admin_page, 'register_menu' ) );

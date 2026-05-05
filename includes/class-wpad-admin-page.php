@@ -15,6 +15,23 @@ class Admin_Page {
 
 	const MENU_SLUG = 'wp-admin-dashly';
 
+	/**
+	 * Snapshot of $menu / $submenu captured BEFORE our customizer runs.
+	 * Populated by capture_raw_menu() hooked at admin_menu priority 100.
+	 */
+	private $raw_menu    = array();
+	private $raw_submenu = array();
+
+	/**
+	 * Snapshot the global $menu/$submenu before our Menu_Customizer modifies them.
+	 * Hooked to admin_menu at priority 100 (customizer runs at 9999).
+	 */
+	public function capture_raw_menu() {
+		global $menu, $submenu;
+		$this->raw_menu    = is_array( $menu )    ? $menu    : array();
+		$this->raw_submenu = is_array( $submenu ) ? $submenu : array();
+	}
+
 	public function register_menu() {
 		add_menu_page(
 			__( 'Admin Dashly', 'wp-admin-dashly' ),       // Page title.
@@ -92,10 +109,84 @@ class Admin_Page {
 					'id'           => get_current_user_id(),
 					'display_name' => wp_get_current_user()->display_name,
 				),
+				// $menu and $submenu are populated at this point (admin_enqueue_scripts
+				// fires after admin_menu). Pass them directly so the React app doesn't
+				// need a separate REST round-trip that would find them empty.
+				'adminMenu'     => $this->build_menu_for_js(),
 			)
 		);
 
 		// Set translations (no-op if no .mo files yet; future-proof).
 		wp_set_script_translations( 'wpad-app', 'wp-admin-dashly' );
+	}
+
+	/**
+	 * Serialize the current user's visible admin menu into a flat array
+	 * suitable for JSON / wp_localize_script.
+	 *
+	 * Must be called from admin_enqueue_scripts (after admin_menu) so that
+	 * the global $menu and $submenu are already populated.
+	 *
+	 * @return array
+	 */
+	private function build_menu_for_js() {
+		// Use the pre-customization snapshot so hidden items are still included —
+		// the user needs to see them in the organizer to be able to re-enable them.
+		$menu    = $this->raw_menu;
+		$submenu = $this->raw_submenu;
+
+		$items = array();
+
+		if ( empty( $menu ) ) {
+			return $items;
+		}
+
+		foreach ( $menu as $position => $item ) {
+			// Skip separators — they carry 'wp-menu-separator' in their CSS class (index 4).
+			if ( isset( $item[4] ) && false !== strpos( $item[4], 'wp-menu-separator' ) ) {
+				continue;
+			}
+
+			// Skip items with an empty slug or empty capability.
+			if ( empty( $item[2] ) || empty( $item[1] ) ) {
+				continue;
+			}
+
+			// Skip items the current user cannot access.
+			if ( ! current_user_can( $item[1] ) ) {
+				continue;
+			}
+
+			$slug  = $item[2];
+			// Remove notification bubbles with their content first (e.g. "Comments <span>5</span>"),
+			// then strip any remaining tags. Order matters: wp_strip_all_tags removes tags but
+			// keeps inner text, so the regex must run on the raw string first.
+			$label = preg_replace( '/<span[^>]*>.*?<\/span>/si', '', $item[0] );
+			$label = trim( wp_strip_all_tags( $label ) );
+			$icon  = isset( $item[6] ) ? $item[6] : '';
+
+			$children = array();
+			if ( isset( $submenu[ $slug ] ) && is_array( $submenu[ $slug ] ) ) {
+				foreach ( $submenu[ $slug ] as $sub_item ) {
+					if ( empty( $sub_item[1] ) || ! current_user_can( $sub_item[1] ) ) {
+						continue;
+					}
+					$children[] = array(
+						'slug'  => $sub_item[2],
+						'label' => wp_strip_all_tags( $sub_item[0] ),
+					);
+				}
+			}
+
+			$items[] = array(
+				'slug'     => $slug,
+				'label'    => $label,
+				'icon'     => $icon,
+				'position' => (int) $position,
+				'children' => $children,
+			);
+		}
+
+		return $items;
 	}
 }

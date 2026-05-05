@@ -220,6 +220,61 @@ class Defaults {
 	}
 
 	/**
+	 * Returns the default (empty) menu preferences diff.
+	 * An empty diff means "use WordPress defaults".
+	 *
+	 * @return array
+	 */
+	public static function get_menu_preference_defaults() {
+		return array(
+			'order'  => array(),
+			'hidden' => array(),
+			'labels' => array(),
+			'pinned' => array(),
+		);
+	}
+
+	/**
+	 * Sanitize a raw menu preferences diff.
+	 * Slugs and labels are sanitized; unknown top-level keys are dropped.
+	 *
+	 * @param array $input Raw input from the REST request.
+	 * @return array
+	 */
+	public static function sanitize_menu_preferences( $input ) {
+		$out = self::get_menu_preference_defaults();
+
+		if ( isset( $input['order'] ) && is_array( $input['order'] ) ) {
+			foreach ( $input['order'] as $slug ) {
+				$out['order'][] = sanitize_text_field( (string) $slug );
+			}
+		}
+
+		if ( isset( $input['hidden'] ) && is_array( $input['hidden'] ) ) {
+			foreach ( $input['hidden'] as $slug ) {
+				$out['hidden'][] = sanitize_text_field( (string) $slug );
+			}
+		}
+
+		if ( isset( $input['labels'] ) && is_array( $input['labels'] ) ) {
+			foreach ( $input['labels'] as $slug => $label ) {
+				$clean_slug = sanitize_text_field( (string) $slug );
+				if ( $clean_slug ) {
+					$out['labels'][ $clean_slug ] = sanitize_text_field( (string) $label );
+				}
+			}
+		}
+
+		if ( isset( $input['pinned'] ) && is_array( $input['pinned'] ) ) {
+			foreach ( $input['pinned'] as $slug ) {
+				$out['pinned'][] = sanitize_text_field( (string) $slug );
+			}
+		}
+
+		return $out;
+	}
+
+	/**
 	 * Available font families. Keys are stored values; arrays carry
 	 * label and CSS font-family stack for the frontend/injector.
 	 *

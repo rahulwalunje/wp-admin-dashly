@@ -166,14 +166,10 @@ class REST_Controller {
 	}
 
 	public function get_presets( \WP_REST_Request $request ) {
-		$builtin = Defaults::get_presets();
-		$custom  = $this->get_custom_presets_for_user( get_current_user_id() );
-
-		// Custom presets are returned in a separate key so the UI can distinguish them.
 		return rest_ensure_response(
 			array(
-				'presets'        => $builtin,
-				'custom_presets' => $custom,
+				'presets'        => Defaults::get_presets(),
+				'custom_presets' => Custom_Presets::get_for_user( get_current_user_id() ),
 				'font_families'  => Defaults::get_font_families(),
 			)
 		);
@@ -185,48 +181,18 @@ class REST_Controller {
 	 * @param \WP_REST_Request $request
 	 * @return \WP_REST_Response|\WP_Error
 	 */
-	const MAX_CUSTOM_PRESETS = 25;
-
 	public function save_custom_preset( \WP_REST_Request $request ) {
-		$body = $request->get_json_params();
-		$name = isset( $body['name'] ) ? sanitize_text_field( $body['name'] ) : '';
+		$body        = $request->get_json_params();
+		$name        = isset( $body['name'] ) ? $body['name'] : '';
+		$preferences = isset( $body['preferences'] ) ? $body['preferences'] : array();
 
-		if ( empty( $name ) ) {
-			return new \WP_Error( 'missing_name', __( 'Preset name is required.', 'wp-admin-dashly' ), array( 'status' => 400 ) );
+		$result = Custom_Presets::save( get_current_user_id(), $name, $preferences );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
-		$preferences = isset( $body['preferences'] ) && is_array( $body['preferences'] ) ? $body['preferences'] : array();
-
-		// Reuse the same sanitizer as regular preferences.
-		$preferences = Preferences::sanitize( $preferences );
-
-		$user_id = get_current_user_id();
-		$presets = $this->get_custom_presets_for_user( $user_id );
-
-		if ( count( $presets ) >= self::MAX_CUSTOM_PRESETS ) {
-			return new \WP_Error(
-				'preset_limit_reached',
-				sprintf(
-					/* translators: %d: maximum number of presets allowed */
-					__( 'You can save up to %d custom presets.', 'wp-admin-dashly' ),
-					self::MAX_CUSTOM_PRESETS
-				),
-				array( 'status' => 400 )
-			);
-		}
-
-		// Generate a stable slug from name + timestamp suffix to avoid collisions.
-		$id = 'custom_' . sanitize_title( $name ) . '_' . time();
-
-		$presets[ $id ] = array(
-			'name'        => $name,
-			'description' => __( 'Custom preset', 'wp-admin-dashly' ),
-			'preferences' => $preferences,
-		);
-
-		update_user_meta( $user_id, 'wpad_custom_presets', $presets );
-
-		return rest_ensure_response( array( 'id' => $id, 'custom_presets' => $presets ) );
+		return rest_ensure_response( $result );
 	}
 
 	/**
@@ -236,29 +202,13 @@ class REST_Controller {
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function delete_custom_preset( \WP_REST_Request $request ) {
-		$id      = $request->get_param( 'id' );
-		$user_id = get_current_user_id();
-		$presets = $this->get_custom_presets_for_user( $user_id );
+		$result = Custom_Presets::delete( get_current_user_id(), $request->get_param( 'id' ) );
 
-		if ( ! isset( $presets[ $id ] ) ) {
-			return new \WP_Error( 'not_found', __( 'Preset not found.', 'wp-admin-dashly' ), array( 'status' => 404 ) );
+		if ( is_wp_error( $result ) ) {
+			return $result;
 		}
 
-		unset( $presets[ $id ] );
-		update_user_meta( $user_id, 'wpad_custom_presets', $presets );
-
-		return rest_ensure_response( array( 'custom_presets' => $presets ) );
-	}
-
-	/**
-	 * Returns the custom presets array for the given user, always as an array.
-	 *
-	 * @param int $user_id
-	 * @return array
-	 */
-	private function get_custom_presets_for_user( $user_id ) {
-		$presets = get_user_meta( $user_id, 'wpad_custom_presets', true );
-		return is_array( $presets ) ? $presets : array();
+		return rest_ensure_response( $result );
 	}
 
 	/**

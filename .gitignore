@@ -1,4 +1,4 @@
 node_modules/
-agents/
+.claude/
 .DS_Store
 *.log

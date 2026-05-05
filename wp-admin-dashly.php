@@ -30,6 +30,7 @@ define( 'WPAD_REST_NAMESPACE', 'wp-admin-dashly/v1' );
 // Load includes.
 require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-defaults.php';
 require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-preferences.php';
+require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-custom-presets.php';
 require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-rest-controller.php';
 require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-admin-page.php';
 require_once WPAD_PLUGIN_DIR . 'includes/class-wpad-style-injector.php';

@@ -11,7 +11,7 @@
  * Changes are saved explicitly via the Save button (same UX as other tabs).
  */
 
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from '@wordpress/element';
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle, Fragment } from '@wordpress/element';
 import { Button, TextControl, Notice, Spinner } from '@wordpress/components';
 import {
 	DndContext,
@@ -149,16 +149,24 @@ const MenuOrganizer = forwardRef( function MenuOrganizer( { onSaveStart, onSaveE
 
 	const togglePinned = useCallback( ( slug ) => {
 		setPrefs( ( prev ) => {
-			const wasPinned = prev.pinned.includes( slug );
-			const pinned    = wasPinned
+			const wasPinned  = prev.pinned.includes( slug );
+			const nextPinned = wasPinned
 				? prev.pinned.filter( ( s ) => s !== slug )
 				: [ ...prev.pinned, slug ];
-			// Also update sortOrder: move to/from top.
+
+			// Move the slug to/from the pinned block. After the toggle the pinned
+			// block occupies positions [0, nextPinned.length).
 			setSortOrder( ( prevOrder ) => {
 				const without = prevOrder.filter( ( s ) => s !== slug );
-				return wasPinned ? [ ...without.slice( 0, prev.pinned.length - 1 ), slug, ...without.slice( prev.pinned.length - 1 ) ] : [ slug, ...without ];
+				if ( wasPinned ) {
+					// Unpin: insert at the boundary between pinned and unpinned.
+					return [ ...without.slice( 0, nextPinned.length ), slug, ...without.slice( nextPinned.length ) ];
+				}
+				// Pin: prepend so the new pinned item appears at the top.
+				return [ slug, ...without ];
 			} );
-			return { ...prev, pinned };
+
+			return { ...prev, pinned: nextPinned };
 		} );
 	}, [] );
 
@@ -246,19 +254,18 @@ const MenuOrganizer = forwardRef( function MenuOrganizer( { onSaveStart, onSaveE
 			<DndContext sensors={ sensors } collisionDetection={ closestCenter } onDragEnd={ handleDragEnd }>
 				<SortableContext items={ displayList } strategy={ verticalListSortingStrategy }>
 					{ displayList.map( ( slug, index ) => (
-						<>
+						<Fragment key={ slug }>
 							{ index === pinnedCount && pinnedCount > 0 && (
-								<div key="pinned-divider" className="wpad-menu-divider">Other items</div>
+								<div className="wpad-menu-divider">Other items</div>
 							) }
 							<MenuRow
-								key={ slug }
 								item={ slugToItem[ slug ] }
 								prefs={ prefs }
 								onToggleHidden={ toggleHidden }
 								onTogglePinned={ togglePinned }
 								onLabelChange={ handleLabelChange }
 							/>
-						</>
+						</Fragment>
 					) ) }
 				</SortableContext>
 			</DndContext>

@@ -5,22 +5,11 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from '@wordpress/element';
 import {
 	TabPanel,
-	Panel,
-	PanelBody,
-	PanelRow,
-	Button,
-	ColorPicker,
-	RangeControl,
-	SelectControl,
-	ToggleControl,
 	Notice,
 	Spinner,
 	Card,
 	CardBody,
 	CardHeader,
-	Popover,
-	__experimentalHStack as HStack,
-	__experimentalVStack as VStack,
 	__experimentalHeading as Heading,
 	__experimentalText as Text,
 	Flex,
@@ -32,6 +21,13 @@ import { __ } from '@wordpress/i18n';
 import { getPreferences, savePreferences, resetPreferences, getPresets, saveCustomPreset, deleteCustomPreset } from './api';
 import { applyLivePreview } from './livePreview';
 import MenuOrganizer from './MenuOrganizer';
+import MiniPreview from './components/MiniPreview';
+import ActionsPanel from './components/ActionsPanel';
+import PresetsTab from './tabs/PresetsTab';
+import ColorsTab from './tabs/ColorsTab';
+import TypographyTab from './tabs/TypographyTab';
+import LayoutTab from './tabs/LayoutTab';
+import GeneralTab from './tabs/GeneralTab';
 
 const DEFAULT_PREFS = {
 	enabled: true,
@@ -47,27 +43,19 @@ const DEFAULT_PREFS = {
 	schema_version: 1,
 };
 
-export default function App() {
-	const [ prefs, setPrefs ]               = useState( DEFAULT_PREFS );
-	const [ initialPrefs, setInitialPrefs ] = useState( DEFAULT_PREFS );
-	const [ presets, setPresets ]           = useState( {} );
-	const [ customPresets, setCustomPresets ] = useState( {} );
-	const [ fontFamilies, setFontFamilies ] = useState( {} );
-	const [ status, setStatus ]             = useState( { loading: true, saving: false, error: null, savedAt: 0 } );
-	const [ confirmReset, setConfirmReset ] = useState( false );
-	const [ savePresetName, setSavePresetName ] = useState( '' );
-	const [ showSavePreset, setShowSavePreset ] = useState( false );
-	const [ savingPreset, setSavingPreset ]     = useState( false );
-	const [ activeTab, setActiveTab ]           = useState( 'presets' );
-	const [ menuSaving, setMenuSaving ]         = useState( false );
-	const [ menuDirty, setMenuDirty ]           = useState( false );
-	const [ savedFlash, setSavedFlash ]         = useState( false );
-	const menuRef                               = useRef();
+const SAVED_FLASH_MS = 3000;
 
-	const flashSaved = useCallback( () => {
-		setSavedFlash( true );
-		setTimeout( () => setSavedFlash( false ), 3000 );
-	}, [] );
+export default function App() {
+	const [ prefs, setPrefs ]                 = useState( DEFAULT_PREFS );
+	const [ initialPrefs, setInitialPrefs ]   = useState( DEFAULT_PREFS );
+	const [ presets, setPresets ]             = useState( {} );
+	const [ customPresets, setCustomPresets ] = useState( {} );
+	const [ fontFamilies, setFontFamilies ]   = useState( {} );
+	const [ status, setStatus ]               = useState( { loading: true, saving: false, error: null, savedAt: 0 } );
+	const [ activeTab, setActiveTab ]         = useState( 'presets' );
+	const [ menuSaving, setMenuSaving ]       = useState( false );
+	const [ menuDirty, setMenuDirty ]         = useState( false );
+	const menuRef                             = useRef();
 
 	// Initial load.
 	useEffect( () => {
@@ -106,6 +94,17 @@ export default function App() {
 		return () => window.removeEventListener( 'beforeunload', handler );
 	}, [ isDirty ] );
 
+	// "Saved!" notice — auto-clears after SAVED_FLASH_MS. Effect cleanup
+	// kills the timer if the component unmounts or another save resets it.
+	const showSavedFlash = status.savedAt > 0 && ! status.error;
+	useEffect( () => {
+		if ( ! showSavedFlash ) return undefined;
+		const id = setTimeout( () => {
+			setStatus( ( s ) => ( s.savedAt ? { ...s, savedAt: 0 } : s ) );
+		}, SAVED_FLASH_MS );
+		return () => clearTimeout( id );
+	}, [ status.savedAt, showSavedFlash ] );
+
 	// --- Updaters ---
 
 	const updateColor = useCallback( ( key, value ) => {
@@ -118,6 +117,10 @@ export default function App() {
 
 	const updateLayout = useCallback( ( key, value ) => {
 		setPrefs( ( p ) => ( { ...p, preset: 'custom', layout: { ...p.layout, [ key ]: value } } ) );
+	}, [] );
+
+	const updateEnabled = useCallback( ( value ) => {
+		setPrefs( ( p ) => ( { ...p, enabled: value } ) );
 	}, [] );
 
 	const applyPreset = useCallback( ( presetKey ) => {
@@ -142,7 +145,6 @@ export default function App() {
 			setPrefs( saved );
 			setInitialPrefs( saved );
 			setStatus( { loading: false, saving: false, error: null, savedAt: Date.now() } );
-			flashSaved();
 		} catch ( err ) {
 			setStatus( ( s ) => ( { ...s, saving: false, error: err.message || 'Save failed' } ) );
 		}
@@ -162,19 +164,14 @@ export default function App() {
 
 	const handleDiscard = () => setPrefs( initialPrefs );
 
-	const handleSaveAsPreset = async () => {
-		const name = savePresetName.trim();
-		if ( ! name ) return;
-		setSavingPreset( true );
+	// Throws on error so ActionsPanel can leave the form open for retry.
+	const handleSaveAsPreset = async ( name ) => {
 		try {
 			const resp = await saveCustomPreset( name, prefs );
 			setCustomPresets( resp.custom_presets || {} );
-			setSavePresetName( '' );
-			setShowSavePreset( false );
 		} catch ( err ) {
 			setStatus( ( s ) => ( { ...s, error: err.message || 'Failed to save preset' } ) );
-		} finally {
-			setSavingPreset( false );
+			throw err;
 		}
 	};
 
@@ -186,6 +183,13 @@ export default function App() {
 			setStatus( ( s ) => ( { ...s, error: err.message || 'Failed to delete preset' } ) );
 		}
 	};
+
+	const handleMenuSaveEnd = useCallback( ( success ) => {
+		setMenuSaving( false );
+		if ( success ) {
+			setStatus( ( s ) => ( { ...s, savedAt: Date.now(), error: null } ) );
+		}
+	}, [] );
 
 	// --- Render ---
 
@@ -211,6 +215,40 @@ export default function App() {
 		{ name: 'general',    title: __( 'General', 'wp-admin-dashly' ),    className: 'wpad-tab' },
 	];
 
+	const renderTab = ( name ) => {
+		switch ( name ) {
+			case 'presets':
+				return (
+					<PresetsTab
+						presets={ presets }
+						customPresets={ customPresets }
+						activePreset={ prefs.preset }
+						onApply={ applyPreset }
+						onDelete={ handleDeleteCustomPreset }
+					/>
+				);
+			case 'colors':
+				return <ColorsTab colors={ prefs.colors } onUpdate={ updateColor } />;
+			case 'typography':
+				return <TypographyTab typography={ prefs.typography } fontOptions={ fontOptions } onUpdate={ updateTypography } />;
+			case 'layout':
+				return <LayoutTab layout={ prefs.layout } onUpdate={ updateLayout } />;
+			case 'menu':
+				return (
+					<MenuOrganizer
+						ref={ menuRef }
+						onSaveStart={ () => setMenuSaving( true ) }
+						onSaveEnd={ handleMenuSaveEnd }
+						onDirtyChange={ setMenuDirty }
+					/>
+				);
+			case 'general':
+				return <GeneralTab enabled={ prefs.enabled } onChange={ updateEnabled } />;
+			default:
+				return null;
+		}
+	};
+
 	return (
 		<div className="wpad-app">
 			<header className="wpad-header">
@@ -234,7 +272,7 @@ export default function App() {
 					{ status.error }
 				</Notice>
 			) }
-			{ savedFlash && ! status.error && (
+			{ showSavedFlash && (
 				<Notice status="success" isDismissible={ false } className="wpad-notice">
 					{ __( 'Saved!', 'wp-admin-dashly' ) }
 				</Notice>
@@ -245,133 +283,11 @@ export default function App() {
 					<TabPanel
 						className="wpad-tabs"
 						tabs={ tabs }
-						onSelect={ ( tab ) => { setActiveTab( tab ); setConfirmReset( false ); } }
+						onSelect={ setActiveTab }
 					>
 						{ ( tab ) => (
 							<div className="wpad-tab-content">
-								{ tab.name === 'presets' && (
-									<div>
-										<div className="wpad-preset-grid">
-											{ Object.entries( presets ).map( ( [ key, preset ] ) => (
-												<PresetCard
-													key={ key }
-													presetKey={ key }
-													preset={ preset }
-													active={ prefs.preset === key }
-													onApply={ applyPreset }
-												/>
-											) ) }
-										</div>
-
-										{ Object.keys( customPresets ).length > 0 && (
-											<>
-												<div className="wpad-preset-section-label">{ __( 'Your presets', 'wp-admin-dashly' ) }</div>
-												<div className="wpad-preset-grid">
-													{ Object.entries( customPresets ).map( ( [ key, preset ] ) => (
-														<PresetCard
-															key={ key }
-															presetKey={ key }
-															preset={ preset }
-															active={ prefs.preset === key }
-															onApply={ applyPreset }
-															onDelete={ handleDeleteCustomPreset }
-															isCustom
-														/>
-													) ) }
-												</div>
-											</>
-										) }
-									</div>
-								) }
-
-								{ tab.name === 'colors' && (
-									<VStack spacing={ 2 }>
-										<ColorField
-											label={ __( 'Accent', 'wp-admin-dashly' ) }
-											help={ __( 'Primary buttons, focus rings, active menu items.', 'wp-admin-dashly' ) }
-											value={ prefs.colors.accent }
-											onChange={ ( v ) => updateColor( 'accent', v ) }
-										/>
-										<ColorField
-											label={ __( 'Sidebar Background', 'wp-admin-dashly' ) }
-											value={ prefs.colors.sidebar_bg }
-											onChange={ ( v ) => updateColor( 'sidebar_bg', v ) }
-										/>
-										<ColorField
-											label={ __( 'Sidebar Text', 'wp-admin-dashly' ) }
-											value={ prefs.colors.sidebar_text }
-											onChange={ ( v ) => updateColor( 'sidebar_text', v ) }
-										/>
-										<ColorField
-											label={ __( 'Top Admin Bar', 'wp-admin-dashly' ) }
-											value={ prefs.colors.admin_bar_bg }
-											onChange={ ( v ) => updateColor( 'admin_bar_bg', v ) }
-										/>
-									</VStack>
-								) }
-
-								{ tab.name === 'typography' && (
-									<VStack spacing={ 4 }>
-										<SelectControl
-											label={ __( 'Font Family', 'wp-admin-dashly' ) }
-											value={ prefs.typography.font_family }
-											options={ fontOptions }
-											onChange={ ( v ) => updateTypography( 'font_family', v ) }
-											__nextHasNoMarginBottom
-											__next40pxDefaultSize
-										/>
-										<RangeControl
-											label={ __( 'Base Font Size', 'wp-admin-dashly' ) }
-											value={ prefs.typography.font_size }
-											onChange={ ( v ) => updateTypography( 'font_size', v ) }
-											min={ 12 }
-											max={ 18 }
-											step={ 1 }
-											__nextHasNoMarginBottom
-											__next40pxDefaultSize
-										/>
-									</VStack>
-								) }
-
-								{ tab.name === 'layout' && (
-									<VStack spacing={ 4 }>
-										<RangeControl
-											label={ __( 'Corner Roundness', 'wp-admin-dashly' ) }
-											help={ __( 'Border radius for buttons, inputs, and cards across admin.', 'wp-admin-dashly' ) }
-											value={ prefs.layout.border_radius }
-											onChange={ ( v ) => updateLayout( 'border_radius', v ) }
-											min={ 0 }
-											max={ 20 }
-											step={ 1 }
-											__nextHasNoMarginBottom
-											__next40pxDefaultSize
-										/>
-									</VStack>
-								) }
-
-								{ tab.name === 'menu' && (
-									<MenuOrganizer
-										ref={ menuRef }
-										onSaveStart={ () => setMenuSaving( true ) }
-										onSaveEnd={ ( success ) => {
-											setMenuSaving( false );
-											if ( success ) flashSaved();
-										} }
-										onDirtyChange={ setMenuDirty }
-									/>
-								) }
-
-								{ tab.name === 'general' && (
-									<PanelRow>
-										<ToggleControl
-											label={ __( 'Enable Dashly styling', 'wp-admin-dashly' ) }
-											help={ __( 'Turn off to revert to vanilla WP admin styling without losing your saved settings.', 'wp-admin-dashly' ) }
-											checked={ prefs.enabled }
-											onChange={ ( v ) => setPrefs( ( p ) => ( { ...p, enabled: v } ) ) }
-											__nextHasNoMarginBottom
-										/>
-									</PanelRow>
-								) }
+								{ renderTab( tab.name ) }
 							</div>
 						) }
 					</TabPanel>
@@ -391,266 +307,22 @@ export default function App() {
 					</Card>
 
 					<div className="wpad-actions">
-						{ activeTab === 'menu' ? (
-							<>
-								<Flex>
-									<FlexBlock>
-										<Button
-											variant="primary"
-											onClick={ () => menuRef.current?.save() }
-											isBusy={ menuSaving }
-											disabled={ ! menuDirty || menuSaving }
-										>
-											{ menuSaving ? __( 'Saving…', 'wp-admin-dashly' ) : __( 'Save Changes', 'wp-admin-dashly' ) }
-										</Button>
-									</FlexBlock>
-								</Flex>
-
-								{ ! confirmReset ? (
-									<Button
-										variant="link"
-										onClick={ () => setConfirmReset( true ) }
-										isDestructive
-									>
-										{ __( 'Restore original menu', 'wp-admin-dashly' ) }
-									</Button>
-								) : (
-									<div className="wpad-reset-confirm">
-										<span className="wpad-reset-confirm-label">
-											{ __( 'Restore the original menu order, visibility and labels?', 'wp-admin-dashly' ) }
-										</span>
-										<Flex>
-											<FlexBlock>
-												<Button
-													variant="primary"
-													isDestructive
-													onClick={ () => { setConfirmReset( false ); menuRef.current?.reset(); } }
-													style={ { width: '100%' } }
-												>
-													{ __( 'Yes, reset', 'wp-admin-dashly' ) }
-												</Button>
-											</FlexBlock>
-											<FlexItem>
-												<Button variant="tertiary" onClick={ () => setConfirmReset( false ) }>
-													{ __( 'Cancel', 'wp-admin-dashly' ) }
-												</Button>
-											</FlexItem>
-										</Flex>
-									</div>
-								) }
-							</>
-						) : (
-							<>
-								<Flex>
-									<FlexBlock>
-										<Button
-											variant="primary"
-											onClick={ handleSave }
-											disabled={ ! isDirty || status.saving }
-											isBusy={ status.saving }
-										>
-											{ status.saving ? __( 'Saving…', 'wp-admin-dashly' ) : __( 'Save Changes', 'wp-admin-dashly' ) }
-										</Button>
-									</FlexBlock>
-									<FlexItem>
-										<Button variant="tertiary" onClick={ handleDiscard } disabled={ ! isDirty || status.saving }>
-											{ __( 'Discard', 'wp-admin-dashly' ) }
-										</Button>
-									</FlexItem>
-								</Flex>
-
-								{ ! showSavePreset ? (
-									<Button
-										variant="secondary"
-										onClick={ () => setShowSavePreset( true ) }
-										style={ { width: '100%' } }
-									>
-										{ __( 'Save as preset…', 'wp-admin-dashly' ) }
-									</Button>
-								) : (
-									<div className="wpad-save-preset-form">
-										<input
-											type="text"
-											className="wpad-preset-name-input"
-											placeholder={ __( 'Preset name', 'wp-admin-dashly' ) }
-											value={ savePresetName }
-											onChange={ ( e ) => setSavePresetName( e.target.value ) }
-											onKeyDown={ ( e ) => {
-												if ( e.key === 'Enter' ) handleSaveAsPreset();
-												if ( e.key === 'Escape' ) { setShowSavePreset( false ); setSavePresetName( '' ); }
-											} }
-											// eslint-disable-next-line jsx-a11y/no-autofocus
-											autoFocus
-										/>
-										<Flex>
-											<FlexBlock>
-												<Button
-													variant="primary"
-													onClick={ handleSaveAsPreset }
-													disabled={ ! savePresetName.trim() || savingPreset }
-													isBusy={ savingPreset }
-													style={ { width: '100%' } }
-												>
-													{ __( 'Save', 'wp-admin-dashly' ) }
-												</Button>
-											</FlexBlock>
-											<FlexItem>
-												<Button
-													variant="tertiary"
-													onClick={ () => { setShowSavePreset( false ); setSavePresetName( '' ); } }
-												>
-													{ __( 'Cancel', 'wp-admin-dashly' ) }
-												</Button>
-											</FlexItem>
-										</Flex>
-									</div>
-								) }
-
-								{ ! confirmReset ? (
-									<Button variant="link" onClick={ () => setConfirmReset( true ) } isDestructive>
-										{ __( 'Reset to defaults', 'wp-admin-dashly' ) }
-									</Button>
-								) : (
-									<div className="wpad-reset-confirm">
-										<span className="wpad-reset-confirm-label">
-											{ __( 'Reset all styling to defaults?', 'wp-admin-dashly' ) }
-										</span>
-										<Flex>
-											<FlexBlock>
-												<Button
-													variant="primary"
-													isDestructive
-													onClick={ () => { setConfirmReset( false ); handleReset(); } }
-													isBusy={ status.saving }
-													style={ { width: '100%' } }
-												>
-													{ __( 'Yes, reset', 'wp-admin-dashly' ) }
-												</Button>
-											</FlexBlock>
-											<FlexItem>
-												<Button variant="tertiary" onClick={ () => setConfirmReset( false ) }>
-													{ __( 'Cancel', 'wp-admin-dashly' ) }
-												</Button>
-											</FlexItem>
-										</Flex>
-									</div>
-								) }
-							</>
-						) }
+						<ActionsPanel
+							mode={ activeTab === 'menu' ? 'menu' : 'settings' }
+							isDirty={ isDirty }
+							saving={ status.saving }
+							onSave={ handleSave }
+							onDiscard={ handleDiscard }
+							onReset={ handleReset }
+							onSavePreset={ handleSaveAsPreset }
+							menuDirty={ menuDirty }
+							menuSaving={ menuSaving }
+							onMenuSave={ () => menuRef.current?.save() }
+							onMenuReset={ () => menuRef.current?.reset() }
+						/>
 					</div>
 				</aside>
 			</div>
-		</div>
-	);
-}
-
-/**
- * Color picker row with a floating Popover — no layout shift.
- */
-function ColorField( { label, help, value, onChange } ) {
-	const [ open, setOpen ]   = useState( false );
-	const swatchRef           = useRef();
-
-	return (
-		<div className="wpad-color-field">
-			<HStack alignment="center" justify="space-between">
-				<div>
-					<div className="wpad-field-label">{ label }</div>
-					{ help && <div className="wpad-field-help">{ help }</div> }
-				</div>
-				<button
-					ref={ swatchRef }
-					type="button"
-					className="wpad-swatch"
-					aria-label={ `${ label }: ${ value }` }
-					aria-expanded={ open }
-					style={ { background: value } }
-					onClick={ () => setOpen( ( o ) => ! o ) }
-				>
-					<span className="wpad-swatch-hex">{ value }</span>
-				</button>
-			</HStack>
-
-			{ open && (
-				<Popover
-					anchor={ swatchRef.current }
-					placement="bottom-end"
-					onClose={ () => setOpen( false ) }
-					shift
-					flip
-				>
-					<div className="wpad-color-popover">
-						<ColorPicker
-							color={ value }
-							onChange={ onChange }
-							enableAlpha={ false }
-							copyFormat="hex"
-						/>
-					</div>
-				</Popover>
-			) }
-		</div>
-	);
-}
-
-/**
- * Mini admin chrome preview.
- */
-function MiniPreview( { prefs } ) {
-	return (
-		<div className="wpad-mini-preview" aria-hidden="true">
-			<div className="wpad-mini-bar" style={ { background: prefs.colors.admin_bar_bg } } />
-			<div className="wpad-mini-body">
-				<div className="wpad-mini-side" style={ { background: prefs.colors.sidebar_bg } }>
-					<div className="wpad-mini-side-item" style={ { color: prefs.colors.sidebar_text } }>{ __( 'Posts', 'wp-admin-dashly' ) }</div>
-					<div className="wpad-mini-side-item wpad-mini-active" style={ { background: prefs.colors.accent, color: '#fff' } }>{ __( 'Pages', 'wp-admin-dashly' ) }</div>
-					<div className="wpad-mini-side-item" style={ { color: prefs.colors.sidebar_text } }>{ __( 'Media', 'wp-admin-dashly' ) }</div>
-				</div>
-				<div className="wpad-mini-content">
-					<div className="wpad-mini-card" style={ { borderRadius: `${ prefs.layout.border_radius }px` } }>
-						<div className="wpad-mini-line" />
-						<div className="wpad-mini-line short" />
-						<button className="wpad-mini-btn" style={ { background: prefs.colors.accent, borderRadius: `${ prefs.layout.border_radius }px` } }>
-							{ __( 'Save', 'wp-admin-dashly' ) }
-						</button>
-					</div>
-				</div>
-			</div>
-		</div>
-	);
-}
-
-/**
- * Preset card. Custom presets show a delete button.
- */
-function PresetCard( { presetKey, preset, active, onApply, isCustom = false, onDelete } ) {
-	const c = preset.preferences.colors || {};
-	return (
-		<div className={ `wpad-preset-card${ active ? ' is-active' : '' }` }>
-			<button
-				type="button"
-				className="wpad-preset-card-body"
-				onClick={ () => onApply( presetKey ) }
-			>
-				<div className="wpad-preset-swatches">
-					<span style={ { background: c.sidebar_bg || '#1d2327' } } />
-					<span style={ { background: c.accent || '#2271b1' } } />
-					<span style={ { background: c.sidebar_text || '#f0f0f1' } } />
-					<span style={ { background: c.admin_bar_bg || '#1d2327' } } />
-				</div>
-				<div className="wpad-preset-label">{ preset.name }</div>
-				<div className="wpad-preset-desc">{ preset.description }</div>
-			</button>
-			{ isCustom && onDelete && (
-				<button
-					type="button"
-					className="wpad-preset-delete"
-					aria-label={ __( 'Delete preset', 'wp-admin-dashly' ) }
-					onClick={ () => onDelete( presetKey ) }
-				>
-					&times;
-				</button>
-			) }
 		</div>
 	);
 }
